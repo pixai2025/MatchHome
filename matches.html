@@ -1,0 +1,268 @@
+<!--
+MVP: Página pública de Matches
+Hosting: GitHub Pages (static)
+Backend: Google Apps Script (mismo Sheet que Buscadores/Corredores)
+
+INSTRUCCIONES RÁPIDAS:
+1) Crea un nuevo Apps Script (o usa uno existente) y pega el backend del final (sección BACKEND – Code.gs). Reemplaza SPREADSHEET_ID.
+2) Despliega como Web App (Anyone). Copia la URL y pégala en const API_URL abajo.
+3) Sube este archivo como "matches.html" a tu repo. Enlázalo desde index si quieres.
+-->
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MVP – Matches</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header class="bg-white border-b">
+    <div class="max-w-4xl mx-auto px-4 py-6">
+      <h1 class="text-2xl font-bold">Matches para tu búsqueda</h1>
+      <p class="text-gray-600">Ingresa el <strong>email</strong> que usaste en el brief y te mostraremos propiedades que calcen.</p>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-8">
+    <div class="bg-white rounded-2xl shadow p-6">
+      <form id="matchForm" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div class="md:col-span-3">
+          <label class="block text-sm font-medium">Email del buscador</label>
+          <input id="email" type="email" required placeholder="tu@email.com" class="mt-1 w-full border rounded-lg p-2" />
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium">(Opcional) Comuna</label>
+          <input id="comunaOverride" placeholder="Filtrar por comuna" class="mt-1 w-full border rounded-lg p-2" />
+        </div>
+        <div class="md:col-span-5">
+          <button id="btnBuscar" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-300">Ver matches</button>
+        </div>
+      </form>
+
+      <div id="briefBox" class="mt-6 hidden">
+        <h2 class="text-lg font-semibold mb-2">Tu brief activo</h2>
+        <div id="briefSummary" class="text-sm text-gray-700 bg-gray-50 rounded-lg p-4 border"></div>
+      </div>
+
+      <div id="results" class="mt-6"></div>
+    </div>
+  </main>
+
+  <footer class="max-w-4xl mx-auto px-4 py-8 text-center text-xs text-gray-500">
+    MVP público – Para validar. Luego añadimos privacidad.
+  </footer>
+
+  <script>
+    // Pega aquí la URL de tu Web App de Apps Script para MATCHES (doGet)
+    const API_URL = "https://script.google.com/macros/s/REEMPLAZA_AQUI/exec";
+
+    const form = document.getElementById('matchForm');
+    const results = document.getElementById('results');
+    const briefBox = document.getElementById('briefBox');
+    const briefSummary = document.getElementById('briefSummary');
+
+    function esc(str){ return (str||'').toString().replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s])); }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      results.innerHTML = '';
+      briefBox.classList.add('hidden');
+
+      const email = document.getElementById('email').value.trim();
+      const comunaOverride = document.getElementById('comunaOverride').value.trim();
+      if(!email) return;
+
+      const url = new URL(API_URL);
+      url.searchParams.set('action', 'matches');
+      url.searchParams.set('email', email);
+      if (comunaOverride) url.searchParams.set('comuna', comunaOverride);
+
+      try {
+        const resp = await fetch(url.toString(), { method: 'GET' });
+        if(!resp.ok) throw new Error('Respuesta no OK');
+        const data = await resp.json();
+
+        if (!data || !data.ok) throw new Error(data && data.error ? data.error : 'Sin datos');
+
+        // Mostrar brief
+        const b = data.brief || {};
+        briefSummary.innerHTML = `
+          <div><strong>Operación:</strong> ${esc(b.operacion)} · <strong>Tipo:</strong> ${esc(b.tipo_propiedad||'cualquiera')}</div>
+          <div><strong>Comuna:</strong> ${esc(b.comuna)} · <strong>Sector:</strong> ${esc(b.sector||'-')} · <strong>Radio:</strong> ${esc(b.radio_km||0)} km</div>
+          <div><strong>Programa mín.:</strong> ${esc(b.dorm_min||0)}D / ${esc(b.banos_min||0)}B · <strong>Presupuesto:</strong> ${esc(b.presupuesto_min||0)} - ${esc(b.presupuesto_max||0)} CLP</div>
+          <div><strong>Must‑haves:</strong> ${esc(Array.isArray(b.must_haves)? b.must_haves.join(', ') : (b.must_haves||'-'))}</div>
+        `;
+        briefBox.classList.remove('hidden');
+
+        const items = data.matches || [];
+        if(items.length === 0){
+          results.innerHTML = `<p class="text-sm text-gray-600">No encontramos propiedades que cumplan tu brief todavía. Ajusta filtros o vuelve más tarde.</p>`;
+          return;
+        }
+
+        const cards = items.map(m => {
+          return `
+            <div class="border rounded-xl p-4 mb-3 bg-white">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="font-semibold">${esc(m.tipo_propiedad)} en ${esc(m.comuna)} ${m.sector? '– ' + esc(m.sector) : ''}</div>
+                  <div class="text-sm text-gray-700">${esc(m.dorm)}D / ${esc(m.banos)}B · ${esc(m.m2||'-')} m²</div>
+                  <div class="text-sm text-gray-800 mt-1">Precio: <strong>${Number(m.precio||0).toLocaleString('es-CL')}</strong> CLP</div>
+                  <div class="text-xs text-gray-600 mt-1">Características: ${esc(m.caracteristicas||'-')}</div>
+                  <div class="text-xs text-gray-600 mt-1">Match score: <strong>${Math.round(m.score||0)}</strong>/100</div>
+                </div>
+                <div class="text-right text-sm">
+                  <div class="text-gray-700">Contacto corredor</div>
+                  <div class="font-medium">${esc(m.corredor_nombre||'-')}</div>
+                  <div class="text-xs">${esc(m.corredor_email||'-')}</div>
+                  <div class="text-xs">${esc(m.corredor_telefono||'-')}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        results.innerHTML = `<h2 class="text-lg font-semibold mb-2">${items.length} match(es) encontrados</h2>` + cards;
+
+      } catch(err){
+        console.error(err);
+        results.innerHTML = `<p class="text-sm text-red-600">No se pudo obtener matches: ${esc(err.message||err)}</p>`;
+      }
+    });
+  </script>
+</body>
+</html>
+
+<!-- === BACKEND (GOOGLE APPS SCRIPT) – Code.gs ===
+
+/** MatchHome API – Matches (doGet) **/
+const SPREADSHEET_ID = 'REEMPLAZA_CON_TU_ID';
+const SHEET_BUSCADORES = 'Buscadores';
+const SHEET_CORREDORES = 'Corredores';
+
+function doGet(e){
+  try {
+    var params = e && e.parameter ? e.parameter : {};
+    var action = (params.action||'').toLowerCase();
+
+    if(action === 'matches'){
+      var email = (params.email||'').trim().toLowerCase();
+      var comunaOverride = (params.comuna||'').trim().toLowerCase();
+      if(!email) return json_({ ok:false, error:'Falta email' });
+
+      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var shB = ss.getSheetByName(SHEET_BUSCADORES);
+      var shC = ss.getSheetByName(SHEET_CORREDORES);
+      if(!shB || !shC) return json_({ ok:false, error:'No existen hojas requeridas' });
+
+      var briefs = sheetToObjects_(shB);
+      var props  = sheetToObjects_(shC);
+
+      // 1) Brief más reciente por email
+      var briefsForEmail = briefs.filter(b => String(b.contacto_email||'').toLowerCase() === email);
+      if(briefsForEmail.length === 0) return json_({ ok:true, brief:null, matches:[] });
+      briefsForEmail.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+      var brief = briefsForEmail[0];
+
+      // Normaliza campos numéricos
+      var dormMin = toNum_(brief.dorm_min, 0);
+      var banosMin = toNum_(brief.banos_min, 0);
+      var presuMax = toNum_(brief.presupuesto_max, 0);
+      var comunaBrief = String(brief.comuna||'').toLowerCase();
+      var sectorBrief = String(brief.sector||'').toLowerCase();
+      var tipoBrief = (brief.tipo_propiedad||'').toLowerCase();
+
+      // 2) Filtro base
+      var filtered = props.filter(p => {
+        var comunaProp = String(p.comuna||'').toLowerCase();
+        var sectorProp = String(p.sector||'').toLowerCase();
+        var tipoProp   = String(p.tipo_propiedad||'').toLowerCase();
+        var precio     = toNum_(p.precio, 0);
+        var dorm       = toNum_(p.dorm, 0);
+        var banos      = toNum_(p.banos, 0);
+
+        // Comuna: usa override si viene; si no, el brief
+        var comunaTarget = comunaOverride || comunaBrief;
+        var comunaOk = !comunaTarget || comunaProp === comunaTarget;
+
+        // Sector: si brief trae sector, permitir contiene en cualquiera de los dos sentidos
+        var sectorOk = true;
+        if (sectorBrief) {
+          sectorOk = sectorProp.includes(sectorBrief) || sectorBrief.includes(sectorProp);
+        }
+
+        // Tipo: si brief especifica tipo distinto de vacío, exigir igualdad
+        var tipoOk = !tipoBrief || tipoBrief === 'cualquiera' || tipoProp === tipoBrief;
+
+        var precioOk = !presuMax || (precio && precio <= presuMax);
+        var dormOk = dorm >= dormMin;
+        var banosOk = banos >= banosMin;
+
+        return comunaOk && sectorOk && tipoOk && precioOk && dormOk && banosOk;
+      });
+
+      // 3) Score simple para ordenar
+      var scored = filtered.map(p => {
+        var precio = toNum_(p.precio, 0);
+        var diff = presuMax ? Math.max(0, presuMax - precio) : 0; // mientras más bajo el precio, mayor score
+        var base = 60 + Math.min(40, Math.round(diff / (presuMax||1) * 40));
+
+        // Bonus por features
+        var feats = String(p.caracteristicas||'').toLowerCase();
+        var bonus = 0;
+        var mustHaves = (brief.must_haves||'').toString().toLowerCase();
+        ['patio','estacionamiento','bodega','amoblado','mascotas'].forEach(f => {
+          if (mustHaves.includes(f) && feats.includes(f)) bonus += 3;
+        });
+
+        p.score = Math.min(100, base + bonus);
+        return p;
+      }).sort((a,b) => (b.score||0) - (a.score||0));
+
+      return json_({ ok:true, brief: brief, matches: scored });
+    }
+
+    // default: help
+    return json_({ ok:true, msg:'Usa ?action=matches&email=...' });
+  } catch(err){
+    return json_({ ok:false, error:String(err) });
+  }
+}
+
+function sheetToObjects_(sh){
+  var range = sh.getDataRange();
+  var values = range.getValues();
+  if(values.length < 2) return [];
+  var headers = values[0].map(h => String(h||'').trim());
+  var rows = [];
+  for (var i=1; i<values.length; i++){
+    var obj = {};
+    for (var j=0; j<headers.length; j++){
+      obj[ headers[j] ] = values[i][j];
+    }
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function toNum_(v, def){
+  var n = Number(v);
+  return isNaN(n) ? def : n;
+}
+
+function json_(obj){
+  var out = ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+  try{
+    out.setHeader('Access-Control-Allow-Origin','*');
+  } catch(_){}
+  return out;
+}
+
+// === FIN BACKEND === -->
