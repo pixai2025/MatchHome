@@ -1,0 +1,345 @@
+<!--
+MVP FORM: Buscador de viviendas (arriendo/compra)
+Hosting: GitHub Pages (static)
+Backend: Google Sheets via Google Apps Script Web App
+
+INSTRUCCIONES RÁPIDAS (lee y luego borra este bloque si quieres):
+1) Crea una Google Sheet con una pestaña llamada "Buscadores" y en la fila 1 pega estos encabezados:
+   timestamp,operacion,comuna,sector,radio_km,tipo_propiedad,dorm_min,banos_min,presupuesto_min,presupuesto_max,must_haves,nice_to_haves,mascotas,contacto_nombre,contacto_email,contacto_telefono,consentimiento
+2) En Apps Script (Extensiones > Apps Script), pega el código del backend (al final de este archivo) y reemplaza SPREADSHEET_ID.
+3) Despliega como Web App: Deploy > New deployment > Type: Web app. Ejecutar como: Tu usuario. Quién tiene acceso: Anyone with the link.
+4) Copia la URL de la Web App y pégala en la constante SCRIPT_URL aquí abajo.
+5) Sube este index.html a un repo y activa GitHub Pages.
+
+NOTA: Si el CORS de tu Web App no permite leer la respuesta, el submit igualmente se registrará; verás un mensaje de éxito "optimista".
+-->
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MVP – Match de Casas (Buscadores)</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --brand:#0ea5e9; }
+    * { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header class="bg-white border-b">
+    <div class="max-w-3xl mx-auto px-4 py-6">
+      <h1 class="text-2xl font-bold">Match de Casas – Brief de Búsqueda</h1>
+      <p class="text-gray-600">Cuéntanos qué necesitas. Avisaremos a corredores con propiedades que calcen.</p>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-8">
+    <div class="bg-white rounded-2xl shadow p-6">
+      <form id="briefForm" class="space-y-6">
+        <!-- Operación y ubicación -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium">Operación</label>
+            <select name="operacion" required class="mt-1 w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-300">
+              <option value="arriendo">Arriendo</option>
+              <option value="compra">Compra</option>
+              <option value="venta">Venta</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Comuna</label>
+            <input name="comuna" required placeholder="Ej: Curicó" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium">Sector / Barrio</label>
+            <input name="sector" placeholder="Ej: Zapallar" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Radio (km)</label>
+            <input type="number" step="0.5" min="0" name="radio_km" value="3" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+        </div>
+
+        <!-- Programa -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium">Tipo de propiedad</label>
+            <select name="tipo_propiedad" class="mt-1 w-full border rounded-lg p-2">
+              <option value="casa">Casa</option>
+              <option value="departamento">Departamento</option>
+              <option value="parcela">Parcela</option>
+              <option value="oficina">Oficina</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Dormitorios (mín.)</label>
+            <input type="number" min="0" name="dorm_min" value="3" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Baños (mín.)</label>
+            <input type="number" min="0" name="banos_min" value="2" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+        </div>
+
+        <!-- Presupuesto -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium">Presupuesto mínimo (CLP)</label>
+            <input type="number" min="0" name="presupuesto_min" placeholder="Ej: 600000" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Presupuesto máximo (CLP)</label>
+            <input type="number" min="0" name="presupuesto_max" placeholder="Ej: 700000" required class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+        </div>
+
+        <!-- Preferencias -->
+        <div>
+          <label class="block text-sm font-medium">Debe tener (must‑haves)</label>
+          <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+            <label class="inline-flex items-center"><input type="checkbox" name="must_haves" value="patio" class="mr-2">Patio</label>
+            <label class="inline-flex items-center"><input type="checkbox" name="must_haves" value="estacionamiento" class="mr-2">Estacionamiento</label>
+            <label class="inline-flex items-center"><input type="checkbox" name="must_haves" value="bodega" class="mr-2">Bodega</label>
+            <label class="inline-flex items-center"><input type="checkbox" name="must_haves" value="amoblado" class="mr-2">Amoblado</label>
+            <label class="inline-flex items-center"><input type="checkbox" name="must_haves" value="logia" class="mr-2">Logia</label>
+            <label class="inline-flex items-center"><input type="checkbox" name="must_haves" value="mascotas" class="mr-2">Se aceptan mascotas</label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium">Bueno si tiene (nice‑to‑haves)</label>
+          <input name="nice_to_haves" placeholder="Ej: cocina amoblada; calefacción; condominio cerrado" class="mt-1 w-full border rounded-lg p-2" />
+        </div>
+
+        <!-- Contacto -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="md:col-span-1">
+            <label class="block text-sm font-medium">Tu nombre</label>
+            <input name="contacto_nombre" required placeholder="Ej: Francisco" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+          <div class="md:col-span-1">
+            <label class="block text-sm font-medium">Email</label>
+            <input type="email" name="contacto_email" required placeholder="tu@email.com" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+          <div class="md:col-span-1">
+            <label class="block text-sm font-medium">Teléfono</label>
+            <input name="contacto_telefono" placeholder="Opcional" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <label class="inline-flex items-center text-sm">
+            <input type="checkbox" name="consentimiento" required class="mr-2" />
+            Acepto ser contactado/a por corredores con propiedades que calcen.
+          </label>
+          <!-- honeypot anti‑spam -->
+          <input type="text" name="_website" class="hidden" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <div class="pt-2">
+          <button id="submitBtn" type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-300">Enviar búsqueda</button>
+        </div>
+
+        <p id="statusMsg" class="text-sm mt-3"></p>
+      </form>
+    </div>
+
+    <section class="mt-8 text-sm text-gray-600">
+      <h2 class="font-semibold mb-2">¿Cómo funciona este MVP?</h2>
+      <ol class="list-decimal ml-6 space-y-1">
+        <li>Guardamos tu búsqueda en una base de datos segura (Google Sheets).</li>
+        <li>Corredores verificados revisan las búsquedas y proponen propiedades que calcen.</li>
+        <li>Solo recibirás propuestas si cumplen tus mínimos (programa, zona, precio).</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="max-w-3xl mx-auto px-4 py-8 text-center text-xs text-gray-500">
+    MVP sin costo: GitHub Pages + Google Sheets · Hecho para validar rápido.
+  </footer>
+
+  <script>
+    // 1) Reemplaza por tu URL de Web App de Apps Script
+    const SCRIPT_URL = "https://script.google.com/macros/s/REEMPLAZA_AQUI/exec";
+
+    const form = document.getElementById('briefForm');
+    const statusMsg = document.getElementById('statusMsg');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function getCheckedValues(name) {
+      return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(el => el.value);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Honeypot (si bots completan este campo oculto, abortar)
+      if (form._website && form._website.value) {
+        return;
+      }
+
+      const formData = new FormData(form);
+      const payload = {
+        operacion: formData.get('operacion') || 'arriendo',
+        comuna: formData.get('comuna')?.trim(),
+        sector: formData.get('sector')?.trim() || '',
+        radio_km: Number(formData.get('radio_km') || 0),
+        tipo_propiedad: formData.get('tipo_propiedad') || 'casa',
+        dorm_min: Number(formData.get('dorm_min') || 0),
+        banos_min: Number(formData.get('banos_min') || 0),
+        presupuesto_min: Number(formData.get('presupuesto_min') || 0),
+        presupuesto_max: Number(formData.get('presupuesto_max') || 0),
+        must_haves: getCheckedValues('must_haves'),
+        nice_to_haves: formData.get('nice_to_haves')?.trim() || '',
+        mascotas: getCheckedValues('must_haves').includes('mascotas'),
+        contacto_nombre: formData.get('contacto_nombre')?.trim(),
+        contacto_email: formData.get('contacto_email')?.trim(),
+        contacto_telefono: formData.get('contacto_telefono')?.trim() || '',
+        consentimiento: formData.get('consentimiento') ? true : false
+      };
+
+      // Validación rápida adicional
+      if (!payload.comuna || !payload.contacto_email || !payload.consentimiento) {
+        statusMsg.textContent = 'Por favor, completa los campos obligatorios.';
+        statusMsg.className = 'text-sm mt-3 text-red-600';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando...';
+      statusMsg.textContent = '';
+
+      try {
+        const resp = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          // Si tu Web App no permite CORS, puedes agregar: mode: 'no-cors'
+          // mode: 'no-cors'
+        });
+
+        // Si CORS OK y responde JSON
+        if (resp.ok) {
+          try {
+            const data = await resp.json();
+            if (data && data.ok) {
+              statusMsg.textContent = '¡Gracias! Tu búsqueda fue registrada. Te contactaremos cuando haya un match.';
+              statusMsg.className = 'text-sm mt-3 text-green-700';
+              form.reset();
+            } else {
+              throw new Error('Respuesta inesperada');
+            }
+          } catch {
+            // CORS puede bloquear leer JSON. Asumimos éxito si no hubo error de red.
+            statusMsg.textContent = '¡Gracias! Tu búsqueda fue registrada.';
+            statusMsg.className = 'text-sm mt-3 text-green-700';
+            form.reset();
+          }
+        } else {
+          throw new Error('Error al enviar');
+        }
+      } catch (err) {
+        console.error(err);
+        statusMsg.textContent = 'Hubo un problema al enviar. Intenta nuevamente.';
+        statusMsg.className = 'text-sm mt-3 text-red-600';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Enviar búsqueda';
+      }
+    });
+  </script>
+</body>
+</html>
+
+
+<!-- === BACKEND (GOOGLE APPS SCRIPT) – pega esto en Code.gs ===
+
+// Reemplaza con el ID de tu Google Sheet (la parte entre /d/ y /edit en la URL)
+const SPREADSHEET_ID = 'REEMPLAZA_CON_TU_ID';
+const SHEET_NAME = 'Buscadores';
+
+function doPost(e) {
+  try {
+    var data = {};
+    if (e.postData && e.postData.contents) {
+      try {
+        data = JSON.parse(e.postData.contents);
+      } catch (err) {
+        // Si no viene JSON, usar parámetros
+        data = e.parameter || {};
+      }
+    }
+
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+
+    var row = [
+      new Date(),
+      data.operacion || '',
+      data.comuna || '',
+      data.sector || '',
+      Number(data.radio_km || 0),
+      data.tipo_propiedad || '',
+      Number(data.dorm_min || 0),
+      Number(data.banos_min || 0),
+      Number(data.presupuesto_min || 0),
+      Number(data.presupuesto_max || 0),
+      (Array.isArray(data.must_haves) ? data.must_haves.join(', ') : ''),
+      data.nice_to_haves || '',
+      data.mascotas ? true : false,
+      data.contacto_nombre || '',
+      data.contacto_email || '',
+      data.contacto_telefono || '',
+      data.consentimiento ? true : false
+    ];
+
+    // Asegurar encabezados si la hoja está vacía
+    if (sh.getLastRow() === 0) {
+      sh.appendRow(['timestamp','operacion','comuna','sector','radio_km','tipo_propiedad','dorm_min','banos_min','presupuesto_min','presupuesto_max','must_haves','nice_to_haves','mascotas','contacto_nombre','contacto_email','contacto_telefono','consentimiento']);
+    }
+
+    sh.appendRow(row);
+
+    var out = ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+    // CORS (puede variar según despliegue). Si no funciona, usa fetch con mode: 'no-cors'.
+    if (out.setHeader) {
+      out.setHeader('Access-Control-Allow-Origin', '*');
+      out.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      out.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+
+    return out;
+  } catch (err) {
+    var errorOut = ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+    if (errorOut.setHeader) {
+      errorOut.setHeader('Access-Control-Allow-Origin', '*');
+      errorOut.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      errorOut.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+    return errorOut;
+  }
+}
+
+function doOptions(e) {
+  // Respuesta a preflight CORS
+  var out = ContentService.createTextOutput('');
+  if (out.setHeader) {
+    out.setHeader('Access-Control-Allow-Origin', '*');
+    out.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    out.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  return out;
+}
+
+// === FIN BACKEND === -->
