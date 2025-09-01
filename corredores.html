@@ -1,0 +1,288 @@
+<!--
+MVP FORM: Carga de Propiedades por Corredores
+Hosting: GitHub Pages (static)
+Backend: Google Sheets via Google Apps Script Web App (proyecto separado del de Buscadores)
+
+INSTRUCCIONES RÁPIDAS:
+1) En tu mismo Google Sheet de datos, crea (o verifica) una hoja llamada "Corredores" con estos encabezados:
+   timestamp,operacion,comuna,sector,precio,tipo_propiedad,dorm,banos,m2,caracteristicas,mascotas,amoblado,estacionamiento,bodega,corredor_nombre,corredor_email,corredor_telefono
+2) Crea un nuevo proyecto de Apps Script y pega el código del backend que está al final de este archivo (sección BACKEND – Code.gs). Reemplaza SPREADSHEET_ID y despliega como Web App (Anyone).
+3) Copia la URL de esa Web App y pégala en la constante SCRIPT_URL aquí abajo.
+4) Sube este archivo como "corredores.html" a tu repo y enlázalo desde el index si quieres.
+-->
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MVP – Match de Casas (Corredores)</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --brand:#0ea5e9; }
+    * { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header class="bg-white border-b">
+    <div class="max-w-3xl mx-auto px-4 py-6">
+      <h1 class="text-2xl font-bold">Carga de Propiedad – Corredores</h1>
+      <p class="text-gray-600">Sube propiedades que cumplan briefs de buscadores. Mantén los datos precisos.</p>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-8">
+    <div class="bg-white rounded-2xl shadow p-6">
+      <form id="propForm" class="space-y-6">
+        <!-- Operación / Ubicación -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium">Operación</label>
+            <select name="operacion" required class="mt-1 w-full border rounded-lg p-2">
+              <option value="arriendo">Arriendo</option>
+              <option value="venta">Venta</option>
+              <option value="compra">Compra</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Comuna</label>
+            <input name="comuna" required placeholder="Ej: Curicó" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Sector/Barrio</label>
+            <input name="sector" placeholder="Ej: Zapallar" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+        </div>
+
+        <!-- Precio / Tipo / Programa -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium">Precio (CLP)</label>
+            <input type="number" min="0" name="precio" required placeholder="Ej: 680000" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Tipo</label>
+            <select name="tipo_propiedad" class="mt-1 w-full border rounded-lg p-2">
+              <option value="casa">Casa</option>
+              <option value="departamento">Departamento</option>
+              <option value="parcela">Parcela</option>
+              <option value="oficina">Oficina</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">m² útiles (opcional)</label>
+            <input type="number" min="0" name="m2" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium">Dormitorios</label>
+            <input type="number" min="0" name="dorm" required value="3" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Baños</label>
+            <input type="number" min="0" name="banos" required value="2" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+        </div>
+
+        <!-- Características -->
+        <div>
+          <label class="block text-sm font-medium">Características</label>
+          <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+            <label class="inline-flex items-center"><input type="checkbox" name="caracteristicas" value="patio" class="mr-2">Patio</label>
+            <label class="inline-flex items-center"><input type="checkbox" name="caracteristicas" value="estacionamiento" class="mr-2">Estacionamiento</label>
+            <label class="inline-flex items-center"><input type="checkbox" name="caracteristicas" value="bodega" class="mr-2">Bodega</label>
+            <label class="inline-flex items-center"><input type="checkbox" name="caracteristicas" value="amoblado" class="mr-2">Amoblado</label>
+            <label class="inline-flex items-center"><input type="checkbox" name="caracteristicas" value="mascotas" class="mr-2">Se aceptan mascotas</label>
+          </div>
+        </div>
+
+        <!-- Contacto corredor -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium">Nombre corredor/a</label>
+            <input name="corredor_nombre" required class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Email</label>
+            <input type="email" name="corredor_email" required class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Teléfono</label>
+            <input name="corredor_telefono" class="mt-1 w-full border rounded-lg p-2" />
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-gray-500">Solo usaremos tus datos para contactar buscadores con match.</span>
+          <!-- honeypot anti‑spam -->
+          <input type="text" name="_site" class="hidden" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <div class="pt-2">
+          <button id="submitBtn" type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-300">Publicar propiedad</button>
+        </div>
+
+        <p id="statusMsg" class="text-sm mt-3"></p>
+      </form>
+    </div>
+
+    <section class="mt-8 text-sm text-gray-600">
+      <h2 class="font-semibold mb-2">Consejos de publicación</h2>
+      <ul class="list-disc ml-6 space-y-1">
+        <li>Usa precios reales y actualizados.</li>
+        <li>Completa dormitorios y baños para mejorar el match.</li>
+        <li>Marca mascotas/estacionamiento/bodega si aplica.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="max-w-3xl mx-auto px-4 py-8 text-center text-xs text-gray-500">
+    MVP sin costo: GitHub Pages + Google Sheets · Corredores
+  </footer>
+
+  <script>
+    // Pega aquí la URL de tu Web App de Apps Script para "Corredores"
+    const SCRIPT_URL = "https://script.google.com/macros/s/REEMPLAZA_AQUI/exec";
+
+    const form = document.getElementById('propForm');
+    const statusMsg = document.getElementById('statusMsg');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function getCheckedValues(name) {
+      return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(el => el.value);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (form._site && form._site.value) return; // honeypot
+
+      const formData = new FormData(form);
+      const payload = {
+        operacion: formData.get('operacion') || 'arriendo',
+        comuna: (formData.get('comuna') || '').trim(),
+        sector: (formData.get('sector') || '').trim(),
+        precio: Number(formData.get('precio') || 0),
+        tipo_propiedad: formData.get('tipo_propiedad') || 'casa',
+        dorm: Number(formData.get('dorm') || 0),
+        banos: Number(formData.get('banos') || 0),
+        m2: Number(formData.get('m2') || 0),
+        caracteristicas: getCheckedValues('caracteristicas').join(', '),
+        mascotas: getCheckedValues('caracteristicas').includes('mascotas'),
+        amoblado: getCheckedValues('caracteristicas').includes('amoblado'),
+        estacionamiento: getCheckedValues('caracteristicas').includes('estacionamiento'),
+        bodega: getCheckedValues('caracteristicas').includes('bodega'),
+        corredor_nombre: (formData.get('corredor_nombre') || '').trim(),
+        corredor_email: (formData.get('corredor_email') || '').trim(),
+        corredor_telefono: (formData.get('corredor_telefono') || '').trim()
+      };
+
+      // Validación mínima
+      if (!payload.comuna || !payload.precio || !payload.corredor_email) {
+        statusMsg.textContent = 'Completa comuna, precio y email del corredor.';
+        statusMsg.className = 'text-sm mt-3 text-red-600';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Publicando...';
+      statusMsg.textContent = '';
+
+      // Envío URL-encoded (evita preflight/CORS)
+      const body = new URLSearchParams();
+      Object.entries(payload).forEach(([k, v]) => body.append(k, typeof v === 'boolean' ? String(v) : v));
+
+      try {
+        const resp = await fetch(SCRIPT_URL, { method: 'POST', body });
+        if (resp.ok) {
+          statusMsg.textContent = '¡Propiedad publicada!';
+          statusMsg.className = 'text-sm mt-3 text-green-700';
+          form.reset();
+        } else {
+          throw new Error('Error al enviar');
+        }
+      } catch (err) {
+        console.error(err);
+        statusMsg.textContent = 'Hubo un problema al enviar. Intenta nuevamente.';
+        statusMsg.className = 'text-sm mt-3 text-red-600';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Publicar propiedad';
+      }
+    });
+  </script>
+</body>
+</html>
+
+<!-- === BACKEND (GOOGLE APPS SCRIPT) – Code.gs ===
+
+/** MatchHome API – Corredores **/
+const SPREADSHEET_ID = 'REEMPLAZA_CON_TU_ID';
+const SHEET_NAME = 'Corredores';
+
+function doPost(e) {
+  try {
+    const data = parseBody_(e);
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+
+    if (sh.getLastRow() === 0) {
+      sh.appendRow([
+        'timestamp','operacion','comuna','sector','precio','tipo_propiedad','dorm','banos','m2','caracteristicas','mascotas','amoblado','estacionamiento','bodega','corredor_nombre','corredor_email','corredor_telefono'
+      ]);
+    }
+
+    sh.appendRow([
+      new Date(),
+      data.operacion || '',
+      data.comuna || '',
+      data.sector || '',
+      Number(data.precio || 0),
+      data.tipo_propiedad || '',
+      Number(data.dorm || 0),
+      Number(data.banos || 0),
+      Number(data.m2 || 0),
+      data.caracteristicas || '',
+      data.mascotas === 'true' || data.mascotas === true,
+      data.amoblado === 'true' || data.amoblado === true,
+      data.estacionamiento === 'true' || data.estacionamiento === true,
+      data.bodega === 'true' || data.bodega === true,
+      data.corredor_nombre || '',
+      data.corredor_email || '',
+      data.corredor_telefono || ''
+    ]);
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doOptions(e) {
+  return ContentService.createTextOutput('');
+}
+
+function parseBody_(e) {
+  let data = {};
+  if (e && e.postData && e.postData.contents) {
+    try {
+      data = JSON.parse(e.postData.contents);
+    } catch (err) {
+      data = e.parameter || {};
+    }
+  } else {
+    data = e.parameter || {};
+  }
+  return data;
+}
+
+// === FIN BACKEND === -->
