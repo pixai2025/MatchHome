@@ -163,97 +163,85 @@ NOTA: Si el CORS de tu Web App no permite leer la respuesta, el submit igualment
   <footer class="max-w-3xl mx-auto px-4 py-8 text-center text-xs text-gray-500">
     MVP sin costo: GitHub Pages + Google Sheets · Hecho para validar rápido.
   </footer>
+<script>
+  // 1) Reemplaza por tu URL de Web App de Apps Script (ya la tienes)
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxj7KNfleF2YfKG19sFVlI_LV2ZUEG3U4OQFvfZHc_Pp0ByEMhzJB6h9gSSK-F-dMk/exec";
 
-  <script>
-    // 1) Reemplaza por tu URL de Web App de Apps Script
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxj7KNfleF2YfKG19sFVlI_LV2ZUEG3U4OQFvfZHc_Pp0ByEMhzJB6h9gSSK-F-dMk/exec";
+  const form = document.getElementById('briefForm');
+  const statusMsg = document.getElementById('statusMsg');
+  const submitBtn = document.getElementById('submitBtn');
 
-    const form = document.getElementById('briefForm');
-    const statusMsg = document.getElementById('statusMsg');
-    const submitBtn = document.getElementById('submitBtn');
+  function getCheckedValues(name) {
+    return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(el => el.value);
+  }
 
-    function getCheckedValues(name) {
-      return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(el => el.value);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Honeypot (si bots completan este campo oculto, abortar)
+    if (form._website && form._website.value) {
+      return;
     }
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+    const formData = new FormData(form);
+    const payload = {
+      operacion: formData.get('operacion') || 'arriendo',
+      comuna: (formData.get('comuna') || '').trim(),
+      sector: (formData.get('sector') || '').trim(),
+      radio_km: Number(formData.get('radio_km') || 0),
+      tipo_propiedad: formData.get('tipo_propiedad') || 'casa',
+      dorm_min: Number(formData.get('dorm_min') || 0),
+      banos_min: Number(formData.get('banos_min') || 0),
+      presupuesto_min: Number(formData.get('presupuesto_min') || 0),
+      presupuesto_max: Number(formData.get('presupuesto_max') || 0),
+      // Para evitar usar e.parameters en Apps Script, mandamos los must_haves como string separado por comas
+      must_haves: getCheckedValues('must_haves').join(', '),
+      nice_to_haves: (formData.get('nice_to_haves') || '').trim(),
+      mascotas: getCheckedValues('must_haves').includes('mascotas'), // true/false
+      contacto_nombre: (formData.get('contacto_nombre') || '').trim(),
+      contacto_email: (formData.get('contacto_email') || '').trim(),
+      contacto_telefono: (formData.get('contacto_telefono') || '').trim(),
+      consentimiento: formData.get('consentimiento') ? true : false
+    };
 
-      // Honeypot (si bots completan este campo oculto, abortar)
-      if (form._website && form._website.value) {
-        return;
+    // Validación rápida adicional
+    if (!payload.comuna || !payload.contacto_email || !payload.consentimiento) {
+      statusMsg.textContent = 'Por favor, completa los campos obligatorios.';
+      statusMsg.className = 'text-sm mt-3 text-red-600';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Enviando...';
+    statusMsg.textContent = '';
+
+    // ------ OPCIÓN RECOMENDADA: URL-ENCODED (sin encabezados, sin JSON) ------
+    const body = new URLSearchParams();
+    Object.entries(payload).forEach(([k, v]) => body.append(k, typeof v === 'boolean' ? String(v) : v));
+
+    try {
+      const resp = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        body // <- sin headers, evita preflight y problemas de CORS
+      });
+
+      if (resp.ok) {
+        statusMsg.textContent = '¡Gracias! Tu búsqueda fue registrada. Te contactaremos cuando haya un match.';
+        statusMsg.className = 'text-sm mt-3 text-green-700';
+        form.reset();
+      } else {
+        throw new Error('Error al enviar');
       }
-
-      const formData = new FormData(form);
-      const payload = {
-        operacion: formData.get('operacion') || 'arriendo',
-        comuna: formData.get('comuna')?.trim(),
-        sector: formData.get('sector')?.trim() || '',
-        radio_km: Number(formData.get('radio_km') || 0),
-        tipo_propiedad: formData.get('tipo_propiedad') || 'casa',
-        dorm_min: Number(formData.get('dorm_min') || 0),
-        banos_min: Number(formData.get('banos_min') || 0),
-        presupuesto_min: Number(formData.get('presupuesto_min') || 0),
-        presupuesto_max: Number(formData.get('presupuesto_max') || 0),
-        must_haves: getCheckedValues('must_haves'),
-        nice_to_haves: formData.get('nice_to_haves')?.trim() || '',
-        mascotas: getCheckedValues('must_haves').includes('mascotas'),
-        contacto_nombre: formData.get('contacto_nombre')?.trim(),
-        contacto_email: formData.get('contacto_email')?.trim(),
-        contacto_telefono: formData.get('contacto_telefono')?.trim() || '',
-        consentimiento: formData.get('consentimiento') ? true : false
-      };
-
-      // Validación rápida adicional
-      if (!payload.comuna || !payload.contacto_email || !payload.consentimiento) {
-        statusMsg.textContent = 'Por favor, completa los campos obligatorios.';
-        statusMsg.className = 'text-sm mt-3 text-red-600';
-        return;
-      }
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Enviando...';
-      statusMsg.textContent = '';
-
-      try {
-        const resp = await fetch(SCRIPT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          // Si tu Web App no permite CORS, puedes agregar: mode: 'no-cors'
-          // mode: 'no-cors'
-        });
-
-        // Si CORS OK y responde JSON
-        if (resp.ok) {
-          try {
-            const data = await resp.json();
-            if (data && data.ok) {
-              statusMsg.textContent = '¡Gracias! Tu búsqueda fue registrada. Te contactaremos cuando haya un match.';
-              statusMsg.className = 'text-sm mt-3 text-green-700';
-              form.reset();
-            } else {
-              throw new Error('Respuesta inesperada');
-            }
-          } catch {
-            // CORS puede bloquear leer JSON. Asumimos éxito si no hubo error de red.
-            statusMsg.textContent = '¡Gracias! Tu búsqueda fue registrada.';
-            statusMsg.className = 'text-sm mt-3 text-green-700';
-            form.reset();
-          }
-        } else {
-          throw new Error('Error al enviar');
-        }
-      } catch (err) {
-        console.error(err);
-        statusMsg.textContent = 'Hubo un problema al enviar. Intenta nuevamente.';
-        statusMsg.className = 'text-sm mt-3 text-red-600';
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Enviar búsqueda';
-      }
-    });
-  </script>
+    } catch (err) {
+      console.error(err);
+      statusMsg.textContent = 'Hubo un problema al enviar. Intenta nuevamente.';
+      statusMsg.className = 'text-sm mt-3 text-red-600';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Enviar búsqueda';
+    }
+  });
+</script>
 </body>
 </html>
 
