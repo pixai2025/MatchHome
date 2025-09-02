@@ -1,3 +1,7 @@
+<!--
+MatchHome – Landing pública (GitHub Pages)
+-->
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -11,7 +15,6 @@
   <style>
     *{ font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
     .container{ max-width: 1150px; }
-    /* Fondo con gradiente y rejilla sutil */
     .bg-grid{ background-image: radial-gradient(rgba(255,255,255,0.6) 1px, transparent 1px); background-size: 16px 16px; }
     .hero-grad{ background: radial-gradient(1200px 600px at 10% -10%, #dbeafe 10%, transparent 50%),
                             radial-gradient(900px 500px at 100% 10%, #e0e7ff 10%, transparent 60%),
@@ -32,6 +35,7 @@
       <nav class="hidden md:flex items-center gap-6 text-sm">
         <a href="#como-funciona" class="hover:text-blue-600">Cómo funciona</a>
         <a href="#beneficios" class="hover:text-blue-600">Beneficios</a>
+        <a href="#que-es" class="hover:text-blue-600">Qué es</a>
         <a href="#faq" class="hover:text-blue-600">Preguntas</a>
         <a href="/buscadores.html" class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-soft">Comenzar</a>
       </nav>
@@ -42,13 +46,14 @@
       <div class="px-4 py-2 space-y-2 text-sm">
         <a href="#como-funciona" class="block">Cómo funciona</a>
         <a href="#beneficios" class="block">Beneficios</a>
+        <a href="#que-es" class="block">Qué es</a>
         <a href="#faq" class="block">Preguntas</a>
         <a href="/buscadores.html" class="block px-3 py-2 rounded-lg bg-blue-600 text-white text-center">Comenzar</a>
       </div>
     </div>
   </header>
 
-  <!-- Hero reforzado -->
+  <!-- Hero -->
   <section class="relative hero-grad overflow-hidden">
     <div class="absolute inset-0 bg-grid opacity-50 pointer-events-none"></div>
     <div class="container mx-auto px-4 py-20">
@@ -60,14 +65,10 @@
           </h1>
           <p class="mt-4 text-gray-700 text-lg">Cuéntanos qué necesitas una vez y recibe propuestas que calzan con tu zona, presupuesto y requisitos. Sin perder tiempo comparando listados que no aplican.</p>
           <div class="mt-6 flex flex-wrap gap-3">
-            <a href="/MatchHome/buscadores.html" class="px-5 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-soft">Estoy buscando</a>
-            <a href="/MatchHome/corredores.html" class="px-5 py-3 rounded-xl bg-gray-900 text-white font-medium hover:bg-black shadow-soft">Soy corredor/a</a>
-            <a href="/MatchHome/matches.html" class="px-5 py-3 rounded-xl border font-medium hover:bg-gray-50">Ver resultados</a>
+            <a href="/buscadores.html" class="px-5 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-soft">Estoy buscando</a>
+            <a href="/corredores.html" class="px-5 py-3 rounded-xl bg-gray-900 text-white font-medium hover:bg-black shadow-soft">Soy corredor/a</a>
+            <a href="/matches.html" class="px-5 py-3 rounded-xl border font-medium hover:bg-gray-50">Ver resultados</a>
           </div>
-          <ul class="mt-6 text-sm text-gray-600 grid gap-2">
-            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-blue-600 rounded-full"></span> Coincidencias basadas en zona, precio y mínimos de dormitorios/baños</li>
-            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-blue-600 rounded-full"></span> Feedback “No es lo que busco” para mejorar recomendaciones</li>
-          </ul>
         </div>
         <div>
           <div class="glass rounded-2xl border p-6 shadow-soft">
@@ -132,14 +133,28 @@
     </div>
   </section>
 
+  <!-- Qué es MatchHome (Pitch) -->
+  <section id="que-es" class="py-16 bg-gray-50 border-t">
+    <div class="container mx-auto px-4 text-center max-w-3xl">
+      <h2 class="text-2xl font-bold mb-4">¿Qué es MatchHome?</h2>
+      <p class="text-lg text-gray-700 leading-relaxed">
+        MatchHome es la forma más simple de encontrar una propiedad que realmente calce contigo. En vez de perder tiempo buscando en decenas de portales o recibir ofertas que no tienen nada que ver, aquí completas <strong>un único formulario</strong> con tus criterios (zona, presupuesto, dormitorios, etc.).
+      </p>
+      <p class="mt-4 text-lg text-gray-700 leading-relaxed">
+        Los corredores cargan sus propiedades y nuestro sistema cruza ambos lados para mostrarte <strong>solo coincidencias reales</strong>. Así, si buscas, recibes propuestas que sí cumplen tus mínimos. Y si eres corredor, tus propiedades llegan directamente a quienes de verdad las necesitan.
+      </p>
+      <p class="mt-6 text-xl font-semibold text-blue-600">Un solo formulario. Todos los corredores. Resultados que sí calzan.</p>
+    </div>
+  </section>
+
   <!-- CTA secciones -->
   <section class="py-12 bg-blue-50 border-t">
     <div class="container mx-auto px-4 text-center">
       <h3 class="text-xl font-semibold">Elige cómo quieres empezar</h3>
       <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
-        <a href="/MatchHome/buscadores.html" class="px-5 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-soft">Estoy buscando</a>
-        <a href="/MatchHome/corredores.html" class="px-5 py-3 rounded-xl bg-gray-900 text-white font-medium hover:bg-black shadow-soft">Soy corredor/a</a>
-        <a href="/MatchHome/matches.html" class="px-5 py-3 rounded-xl border font-medium hover:bg-gray-50">Ver resultados</a>
+        <a href="/buscadores.html" class="px-5 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-soft">Estoy buscando</a>
+        <a href="/corredores.html" class="px-5 py-3 rounded-xl bg-gray-900 text-white font-medium hover:bg-black shadow-soft">Soy corredor/a</a>
+        <a href="/matches.html" class="px-5 py-3 rounded-xl border font-medium hover:bg-gray-50">Ver resultados</a>
       </div>
     </div>
   </section>
@@ -178,7 +193,6 @@
   </footer>
 
   <script>
-    // Año dinámico + menú móvil + scroll suave
     document.getElementById('year').textContent = new Date().getFullYear();
     const menuBtn = document.getElementById('menuBtn');
     const mobileMenu = document.getElementById('mobileMenu');
