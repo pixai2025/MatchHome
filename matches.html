@@ -61,7 +61,7 @@ INSTRUCCIONES RÁPIDAS:
 
   <script>
     // Pega aquí la URL de tu Web App de Apps Script para MATCHES (doGet)
-    const API_URL = "https://script.google.com/macros/s/AKfycbyPn_W3wdidyZIan47IAKKG4U-edA_NifqchuyMjeiCdCosyceXt8u85ePXIvZwd7k/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbxJ9U1CS0HKCBSdev-cLfyDQWUke3bZhmsEP0mbGrb5IU2ZCT0hqlRZdUc0HeChpDY/exec";
 
     const form = document.getElementById('matchForm');
     const results = document.getElementById('results');
@@ -140,84 +140,78 @@ INSTRUCCIONES RÁPIDAS:
 </body>
 </html>
 
-<!-- === BACKEND (GOOGLE APPS SCRIPT) – Code.gs ===
+/** MatchHome API – Matches + Feedback **/
 
-/** MatchHome API – Matches (doGet) **/
-const SPREADSHEET_ID = 'REEMPLAZA_CON_TU_ID';
+const SPREADSHEET_ID = '1GAHPAj9Z_rAVUYq0dIi72A5wizFEdXfJcq31UWsbpOw';        // << reemplaza
 const SHEET_BUSCADORES = 'Buscadores';
 const SHEET_CORREDORES = 'Corredores';
+const SHEET_FEEDBACK   = 'Feedback';
 
 function doGet(e){
   try {
-    var params = e && e.parameter ? e.parameter : {};
-    var action = (params.action||'').toLowerCase();
+    const params = e && e.parameter ? e.parameter : {};
+    const action = (params.action||'').toLowerCase();
 
-    if(action === 'matches'){
-      var email = (params.email||'').trim().toLowerCase();
-      var comunaOverride = (params.comuna||'').trim().toLowerCase();
-      if(!email) return json_({ ok:false, error:'Falta email' });
+    if (action === 'matches') {
+      const email = (params.email||'').trim().toLowerCase();
+      const comunaOverride = (params.comuna||'').trim().toLowerCase();
+      if (!email) return json_({ ok:false, error:'Falta email' });
 
-      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      var shB = ss.getSheetByName(SHEET_BUSCADORES);
-      var shC = ss.getSheetByName(SHEET_CORREDORES);
-      if(!shB || !shC) return json_({ ok:false, error:'No existen hojas requeridas' });
+      const ss  = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const shB = ss.getSheetByName(SHEET_BUSCADORES);
+      const shC = ss.getSheetByName(SHEET_CORREDORES);
+      if (!shB || !shC) return json_({ ok:false, error:'No existen hojas requeridas' });
 
-      var briefs = sheetToObjects_(shB);
-      var props  = sheetToObjects_(shC);
+      // Cargamos con índice de fila para usarlo como ID de propiedad
+      const briefs = sheetToObjects_(shB, /*includeRow*/ true);
+      const props  = sheetToObjects_(shC, /*includeRow*/ true);
 
-      // 1) Brief más reciente por email
-      var briefsForEmail = briefs.filter(b => String(b.contacto_email||'').toLowerCase() === email);
-      if(briefsForEmail.length === 0) return json_({ ok:true, brief:null, matches:[] });
+      // Brief más reciente para ese email
+      const briefsForEmail = briefs.filter(b => String(b.contacto_email||'').toLowerCase() === email);
+      if (briefsForEmail.length === 0) return json_({ ok:true, brief:null, matches:[] });
       briefsForEmail.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
-      var brief = briefsForEmail[0];
+      const brief = briefsForEmail[0];
 
-      // Normaliza campos numéricos
-      var dormMin = toNum_(brief.dorm_min, 0);
-      var banosMin = toNum_(brief.banos_min, 0);
-      var presuMax = toNum_(brief.presupuesto_max, 0);
-      var comunaBrief = String(brief.comuna||'').toLowerCase();
-      var sectorBrief = String(brief.sector||'').toLowerCase();
-      var tipoBrief = (brief.tipo_propiedad||'').toLowerCase();
+      // Normaliza
+      const dormMin    = toNum_(brief.dorm_min, 0);
+      const banosMin   = toNum_(brief.banos_min, 0);
+      const presuMax   = toNum_(brief.presupuesto_max, 0);
+      const comunaBrief= String(brief.comuna||'').toLowerCase();
+      const sectorBrief= String(brief.sector||'').toLowerCase();
+      const tipoBrief  = (brief.tipo_propiedad||'').toLowerCase();
 
-      // 2) Filtro base
-      var filtered = props.filter(p => {
-        var comunaProp = String(p.comuna||'').toLowerCase();
-        var sectorProp = String(p.sector||'').toLowerCase();
-        var tipoProp   = String(p.tipo_propiedad||'').toLowerCase();
-        var precio     = toNum_(p.precio, 0);
-        var dorm       = toNum_(p.dorm, 0);
-        var banos      = toNum_(p.banos, 0);
+      // Filtro base
+      const filtered = props.filter(p => {
+        const comunaProp = String(p.comuna||'').toLowerCase();
+        const sectorProp = String(p.sector||'').toLowerCase();
+        const tipoProp   = String(p.tipo_propiedad||'').toLowerCase();
+        const precio     = toNum_(p.precio, 0);
+        const dorm       = toNum_(p.dorm, 0);
+        const banos      = toNum_(p.banos, 0);
 
-        // Comuna: usa override si viene; si no, el brief
-        var comunaTarget = comunaOverride || comunaBrief;
-        var comunaOk = !comunaTarget || comunaProp === comunaTarget;
+        const comunaTarget = comunaOverride || comunaBrief;
+        const comunaOk = !comunaTarget || comunaProp === comunaTarget;
 
-        // Sector: si brief trae sector, permitir contiene en cualquiera de los dos sentidos
-        var sectorOk = true;
-        if (sectorBrief) {
-          sectorOk = sectorProp.includes(sectorBrief) || sectorBrief.includes(sectorProp);
-        }
+        let sectorOk = true;
+        if (sectorBrief) sectorOk = sectorProp.includes(sectorBrief) || sectorBrief.includes(sectorProp);
 
-        // Tipo: si brief especifica tipo distinto de vacío, exigir igualdad
-        var tipoOk = !tipoBrief || tipoBrief === 'cualquiera' || tipoProp === tipoBrief;
-
-        var precioOk = !presuMax || (precio && precio <= presuMax);
-        var dormOk = dorm >= dormMin;
-        var banosOk = banos >= banosMin;
+        const tipoOk   = !tipoBrief || tipoBrief === 'cualquiera' || tipoProp === tipoBrief;
+        const precioOk = !presuMax || (precio && precio <= presuMax);
+        const dormOk   = dorm >= dormMin;
+        const banosOk  = banos >= banosMin;
 
         return comunaOk && sectorOk && tipoOk && precioOk && dormOk && banosOk;
       });
 
-      // 3) Score simple para ordenar
-      var scored = filtered.map(p => {
-        var precio = toNum_(p.precio, 0);
-        var diff = presuMax ? Math.max(0, presuMax - precio) : 0; // mientras más bajo el precio, mayor score
-        var base = 60 + Math.min(40, Math.round(diff / (presuMax||1) * 40));
+      // Score simple
+      const scored = filtered.map(p => {
+        const precio = toNum_(p.precio, 0);
+        const diff = presuMax ? Math.max(0, presuMax - precio) : 0; // más barato, mejor
+        const base = 60 + Math.min(40, Math.round(diff / (presuMax||1) * 40));
 
-        // Bonus por features
-        var feats = String(p.caracteristicas||'').toLowerCase();
-        var bonus = 0;
-        var mustHaves = (brief.must_haves||'').toString().toLowerCase();
+        const feats = String(p.caracteristicas||'').toLowerCase();
+        let bonus = 0;
+        const mustHaves = (brief.must_haves||'').toString().toLowerCase();
         ['patio','estacionamiento','bodega','amoblado','mascotas'].forEach(f => {
           if (mustHaves.includes(f) && feats.includes(f)) bonus += 3;
         });
@@ -226,43 +220,66 @@ function doGet(e){
         return p;
       }).sort((a,b) => (b.score||0) - (a.score||0));
 
-      return json_({ ok:true, brief: brief, matches: scored });
+      return json_({ ok:true, brief, matches: scored });
     }
 
-    // default: help
     return json_({ ok:true, msg:'Usa ?action=matches&email=...' });
   } catch(err){
     return json_({ ok:false, error:String(err) });
   }
 }
 
-function sheetToObjects_(sh){
-  var range = sh.getDataRange();
-  var values = range.getValues();
-  if(values.length < 2) return [];
-  var headers = values[0].map(h => String(h||'').trim());
-  var rows = [];
-  for (var i=1; i<values.length; i++){
-    var obj = {};
-    for (var j=0; j<headers.length; j++){
+function doPost(e){
+  try {
+    const params = e && e.parameter ? e.parameter : {};
+    const action = (params.action||'').toLowerCase();
+
+    if (action === 'feedback') {
+      const email   = (params.email||'').trim();
+      const propRow = (params.prop_row||'').trim(); // índice de fila en Corredores
+      const reason  = (params.reason||'').trim();
+      const note    = (params.note||'').trim();
+
+      const ss  = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const shF = ss.getSheetByName(SHEET_FEEDBACK) || ss.insertSheet(SHEET_FEEDBACK);
+
+      if (shF.getLastRow() === 0) {
+        shF.appendRow(['timestamp','email','prop_row','reason','note']);
+      }
+      shF.appendRow([new Date(), email, propRow, reason, note]);
+
+      return json_({ ok:true });
+    }
+
+    return json_({ ok:false, error:'Acción inválida' });
+  } catch(err){
+    return json_({ ok:false, error:String(err) });
+  }
+}
+
+/** Utils **/
+function sheetToObjects_(sh, includeRow){
+  const values = sh.getDataRange().getValues();
+  if (values.length < 2) return [];
+  const headers = values[0].map(h => String(h||'').trim());
+  const rows = [];
+  for (let i=1; i<values.length; i++){
+    const obj = {};
+    for (let j=0; j<headers.length; j++){
       obj[ headers[j] ] = values[i][j];
     }
+    if (includeRow) obj._rowIndex = i+1; // índice real en la hoja
     rows.push(obj);
   }
   return rows;
 }
-
-function toNum_(v, def){
-  var n = Number(v);
-  return isNaN(n) ? def : n;
-}
-
+function toNum_(v, def){ const n = Number(v); return isNaN(n) ? def : n; }
 function json_(obj){
-  var out = ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+  const out = ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
   try{
     out.setHeader('Access-Control-Allow-Origin','*');
-  } catch(_){}
+    out.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');
+    out.setHeader('Access-Control-Allow-Headers','Content-Type');
+  } catch(_) {}
   return out;
 }
-
-// === FIN BACKEND === -->
